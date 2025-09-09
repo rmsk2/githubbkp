@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: githubbkp-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: githubbkp-pod
+  template:
+    metadata:
+      labels:
+        app: githubbkp-pod
+    spec:
+      containers:
+      - name: githubbkp-pod-image
+        image: grap.de/githubbkp:v1
+        imagePullPolicy: Never
+        resources: 
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: githubbkp-appdata
