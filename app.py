@@ -1,10 +1,12 @@
 import requests
+import os
 
 def main():
-    help = "this is a test"
+    help = os.environ['GHBKP_TOKEN']
     help_bin = help.encode('utf-8')
+    out_path = os.environ['OUT_PATH']
 
-    with open("/data/test.txt", "wb") as f:
+    with open(out_path + "test.txt", "wb") as f:
         f.write(help_bin)
 
     pass

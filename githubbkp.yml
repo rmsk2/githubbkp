@@ -1,3 +1,13 @@
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: githibbkp-config
+data:
+  OUT_PATH: "/data/"
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -23,6 +33,11 @@ spec:
         volumeMounts:
         - name: data-volume
           mountPath: /data
+        envFrom:
+        - configMapRef:
+            name: githibbkp-config
+        - secretRef:
+            name: githibbkp-secret
       volumes:
       - name: data-volume
         persistentVolumeClaim:
