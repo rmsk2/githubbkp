@@ -5,7 +5,7 @@ metadata:
   name: githibbkp-config
 data:
   OUT_PATH: "/data/"
-  RUN_AT_HOUR: "16"
+  RUN_AT_HOUR: "0"
   PYTHONUNBUFFERED: "Off"
 
 ---
