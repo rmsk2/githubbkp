@@ -168,8 +168,8 @@ def main():
         gschmarri.notify(f"Backup routine started. Performing backup at {conf.run_at_hour} o'clock", conf.api_key)
 
         scheduler = sched.scheduler()
-        scheduler.enter(WAIT_TIME, PRIORITY, perform_github_backup, argument=(conf,scheduler, checker_github.check))
-        scheduler.enter(WAIT_TIME, PRIORITY+1, perform_gschmarri_backup, argument=(conf,scheduler, checker_gschmarri.check))
+        scheduler.enter(WAIT_TIME, PRIORITY, perform_github_backup, argument=(conf, scheduler, checker_github.check))
+        scheduler.enter(WAIT_TIME, PRIORITY+1, perform_gschmarri_backup, argument=(conf, scheduler, checker_gschmarri.check))
         scheduler.run()
     except Exception as e:
         gschmarri.notify(f"Backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])

@@ -5,6 +5,7 @@ metadata:
   name: githibbkp-config
 data:
   OUT_PATH: "/data/"
+  RUN_AT_HOUR: "17"
 
 ---
 
