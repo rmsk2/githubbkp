@@ -165,6 +165,8 @@ def main():
         checker_gschmarri = AroundMidnightOnceChecker(conf.run_at_hour)
         checker_github = AroundMidnightOnceChecker(conf.run_at_hour)
         
+        print(f"WAIT_TIME: {WAIT_TIME}")
+        print(f"Current time: {datetime.datetime.now()}")
         gschmarri.notify(f"Backup routine started. Performing backup at {conf.run_at_hour} o'clock", conf.api_key)
 
         scheduler = sched.scheduler()

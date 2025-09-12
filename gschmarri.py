@@ -1,6 +1,6 @@
 import requests
 import json
-import argparse
+
 
 CONF_API_PREFIX = "/notifier"
 CONF_HOST_NAME = "https://debshuttle"
