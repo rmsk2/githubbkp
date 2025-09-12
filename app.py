@@ -119,10 +119,6 @@ class AroundMidnightOnceChecker:
             return False
 
 
-def dummy():
-    return True
-
-
 def perform_github_backup(conf, scheduler, is_exec_necessary):
     try:
         print("checking if GitHub backup has to be performed")
