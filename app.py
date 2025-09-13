@@ -5,6 +5,7 @@ import datetime
 import gschmarri
 
 WAIT_TIME = 10 * 60
+IMMEDIATELY = 1
 PRIORITY = 1
 CONF_API_KEY_VAR = 'API_KEY'
 CONF_RUN_AT_HOUR = 0
@@ -12,9 +13,11 @@ CONF_RUN_AT_HOUR = 0
 class ConfigData:
     def __init__(self, github_token=None, out_path=None, api_key=None, run_at_hour=None):
         self._github_token = github_token
-        self._out_path = out_path
+        self._out_path = ""
+        self.out_path = out_path
         self._api_key = api_key
         self._run_at_hour = run_at_hour
+        self._exclusions = []
 
     @property
     def github_token(self):
@@ -50,6 +53,15 @@ class ConfigData:
     def run_at_hour(self, value):
         self._run_at_hour = value
 
+    @property
+    def exclusions(self):
+        return self._exclusions
+
+    @exclusions.setter
+    def exclusions(self, value):
+        self._exclusions = value
+
+
 
 def get_run_at_hour():
     try:
@@ -63,8 +75,16 @@ def get_run_at_hour():
         return CONF_RUN_AT_HOUR
 
 
+def get_exclusions():
+    try:
+        return os.environ['EXCLUSIONS'].split()
+    except:
+        return []
+
+
 def get_config():
     res = ConfigData(os.environ['GHBKP_TOKEN'], os.environ['OUT_PATH'], os.environ[CONF_API_KEY_VAR], get_run_at_hour())
+    res.exclusions = get_exclusions()
 
     return res
 
@@ -102,9 +122,16 @@ def safe_write_contents(name_prefix, response):
 class AroundMidnightOnceChecker:
     def __init__(self, run_at_hour):
         self.last_result = False
+        self._has_run_at_least_once = False
         self._run_at_hour = run_at_hour
     
     def check(self):
+        # Make sure we run backup scrips the first time we are called independent of
+        # self._run_at_hour
+        if not self._has_run_at_least_once:
+            self._has_run_at_least_once = True
+            return True
+
         now = datetime.datetime.now()    
         around_midnight = (now.hour >= self._run_at_hour) and (now.hour < (self._run_at_hour + 1))
 
@@ -131,11 +158,15 @@ def perform_github_backup(conf, scheduler, is_exec_necessary):
 
         for repo in repos:
             repo_name = repo['name']
-            api_url = repo['url']
 
-            print(f'backing up {repo_name}')
-            zip_ball_response = requests.get(f'{api_url}/zipball', headers=get_std_headers(conf))        
-            safe_write_contents(f"{conf.out_path}{repo_name}", zip_ball_response)
+            if not (repo_name in conf.exclusions):
+                api_url = repo['url']
+
+                print(f'backing up {repo_name}')
+                zip_ball_response = requests.get(f'{api_url}/zipball', headers=get_std_headers(conf))        
+                safe_write_contents(f"{conf.out_path}{repo_name}", zip_ball_response)
+            else:
+                print(f"Repo {repo_name} was excluded")
             
         print("done")
     finally:
@@ -161,13 +192,14 @@ def main():
         checker_gschmarri = AroundMidnightOnceChecker(conf.run_at_hour)
         checker_github = AroundMidnightOnceChecker(conf.run_at_hour)
         
-        print(f"WAIT_TIME: {WAIT_TIME}")
+        print(f"Interval between checks (in seconds): {WAIT_TIME}")
         print(f"Current time: {datetime.datetime.now()}")
+        print(f"Excluded repos: {conf.exclusions}")
         gschmarri.notify(f"Backup routine started. Performing backup at {conf.run_at_hour} o'clock", conf.api_key)
 
         scheduler = sched.scheduler()
-        scheduler.enter(WAIT_TIME, PRIORITY, perform_github_backup, argument=(conf, scheduler, checker_github.check))
-        scheduler.enter(WAIT_TIME, PRIORITY+1, perform_gschmarri_backup, argument=(conf, scheduler, checker_gschmarri.check))
+        scheduler.enter(IMMEDIATELY, PRIORITY, perform_github_backup, argument=(conf, scheduler, checker_github.check))
+        scheduler.enter(IMMEDIATELY, PRIORITY+1, perform_gschmarri_backup, argument=(conf, scheduler, checker_gschmarri.check))
         scheduler.run()
     except Exception as e:
         gschmarri.notify(f"Backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])

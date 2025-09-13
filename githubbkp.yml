@@ -7,6 +7,7 @@ data:
   OUT_PATH: "/data/"
   RUN_AT_HOUR: "0"
   PYTHONUNBUFFERED: "Off"
+  EXCLUSIONS: "f256-superbasic"
 
 ---
 
