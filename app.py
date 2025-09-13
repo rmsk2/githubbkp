@@ -126,7 +126,7 @@ class AroundMidnightOnceChecker:
         self._run_at_hour = run_at_hour
     
     def check(self):
-        # Make sure we run backup scrips the first time we are called independent of
+        # Make sure we run backup scripts the first time we are called independent of
         # self._run_at_hour
         if not self._has_run_at_least_once:
             self._has_run_at_least_once = True
