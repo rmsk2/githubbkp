@@ -3,6 +3,8 @@ import os
 import sched
 import datetime
 import gschmarri
+import logging
+import sys
 
 WAIT_TIME = 10 * 60
 IMMEDIATELY = 1
@@ -147,12 +149,14 @@ class AroundMidnightOnceChecker:
 
 
 def perform_github_backup(conf, scheduler, is_exec_necessary):
+    logger = logging.getLogger()
+
     try:
-        print("checking if GitHub backup has to be performed")
+        logger.info("checking if GitHub backup has to be performed")
         if not is_exec_necessary():
             return
 
-        print('getting repos')
+        logger.info('getting repos')
         response = requests.get('https://api.github.com/user/repos?per_page=100&type=owner', headers=get_std_headers(conf))
         repos = response.json()
 
@@ -162,40 +166,45 @@ def perform_github_backup(conf, scheduler, is_exec_necessary):
             if not (repo_name in conf.exclusions):
                 api_url = repo['url']
 
-                print(f'backing up {repo_name}')
+                logger.info(f'backing up {repo_name}')
                 zip_ball_response = requests.get(f'{api_url}/zipball', headers=get_std_headers(conf))        
                 safe_write_contents(f"{conf.out_path}{repo_name}", zip_ball_response)
             else:
-                print(f"Repo {repo_name} was excluded")
+                logger.info(f"Repo {repo_name} was excluded")
             
-        print("done")
+        logger.info("done")
     finally:
         scheduler.enter(WAIT_TIME, PRIORITY, perform_github_backup, argument=(conf, scheduler, is_exec_necessary))
 
 
 def perform_gschmarri_backup(conf, scheduler, is_exec_necessary):
+    logger = logging.getLogger()
+
     try:
-        print("checking if Gschmarri-Projekt backup has to be performed")
+        logger.info("checking if Gschmarri-Projekt backup has to be performed")
         if not is_exec_necessary():
             return
 
-        print("backing up Gschmarri-Projekt")
+        logger.info("backing up Gschmarri-Projekt")
         gschmarri.backup(f"{conf.out_path}gschmarri.bkp")
-        print("done")
+        logger.info("done")
     finally:
         scheduler.enter(WAIT_TIME, PRIORITY+1, perform_gschmarri_backup, argument=(conf, scheduler, is_exec_necessary))
 
 
 def main():
+    logging.basicConfig(format='%(asctime)s %(message)s', stream=sys.stdout, level=logging.INFO)
+
     try:
+        logger = logging.getLogger()
         conf = get_config()
         checker_gschmarri = AroundMidnightOnceChecker(conf.run_at_hour)
         checker_github = AroundMidnightOnceChecker(conf.run_at_hour)
         
-        print(f"Interval between checks (in seconds): {WAIT_TIME}")
-        print(f"Current time: {datetime.datetime.now()}")
-        print(f"Excluded repos: {conf.exclusions}")
-        gschmarri.notify(f"Backup routine started. Performing backup at {conf.run_at_hour} o'clock", conf.api_key)
+        logger.info(f"Interval between checks (in seconds): {WAIT_TIME}")
+        logger.info(f"Current time: {datetime.datetime.now()}")
+        logger.info(f"Excluded repos: {conf.exclusions}")
+        logger.info(f"Performing backup at {conf.run_at_hour} o'clock")
 
         scheduler = sched.scheduler()
         scheduler.enter(IMMEDIATELY, PRIORITY, perform_github_backup, argument=(conf, scheduler, checker_github.check))
