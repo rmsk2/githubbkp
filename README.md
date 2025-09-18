@@ -16,7 +16,7 @@ These variables are all set in a `ConfigMap` in the the file `githubbkp.yml`. A 
 | `GHBKP_TOKEN`| A personal GitHub access token (classic or finegrained) which grants read only access to the contents of private repos|
 |`API_KEY`| API key to access the `/api/send` endpoint of [mobilenitfier](https://github.com/rmsk2/mobilenotifier)|
 
-Here a template which can be used to create a kubernetes secret:
+Here a template which can be used to create this secret:
 
 ```yml
 apiVersion: v1
