@@ -64,7 +64,6 @@ class ConfigData:
         self._exclusions = value
 
 
-
 def get_run_at_hour():
     try:
         value = os.environ['RUN_AT_HOUR']
