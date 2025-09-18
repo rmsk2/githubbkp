@@ -1,5 +1,6 @@
 # githubbkp
-Tool to backup the latest commit in any of my repos and the state of mobile motifier.
+Tool to backup all of my public and private repos and the state of mobile motifier. This is intended to be run in kubernetes. Find the deployment in `githubbkp.yml` and the pvc
+in `pvc.yml`.
 
 Environment variables:
 
