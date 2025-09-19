@@ -5,6 +5,7 @@ import datetime
 import gschmarri
 import logging
 import sys
+import re
 
 WAIT_TIME = 10 * 60
 IMMEDIATELY = 1
@@ -147,6 +148,31 @@ class AroundMidnightOnceChecker:
             return False
 
 
+def get_all_repos(conf):
+    res = []
+    re_exp = r'^.*<(https://api.github.com/.+)>;\s+rel="next".*$'
+    exp = re.compile(re_exp)
+    next_found = True
+    # Implement full pagination just in case someone has more than 100
+    # repos ;-).
+    url = 'https://api.github.com/user/repos?per_page=30&type=owner'
+
+    while next_found:
+        response = requests.get(url, headers=get_std_headers(conf))
+        json_data = response.json()
+        res = res + json_data
+
+        match = exp.search(response.headers['Link'])
+
+        if match != None:
+            next_found = True
+            url = match.group(1)
+        else:
+            next_found = False
+
+    return  res
+
+
 def perform_github_backup(conf, scheduler, is_exec_necessary):
     logger = logging.getLogger()
 
@@ -156,8 +182,8 @@ def perform_github_backup(conf, scheduler, is_exec_necessary):
             return
 
         logger.info('getting repos')
-        response = requests.get('https://api.github.com/user/repos?per_page=100&type=owner', headers=get_std_headers(conf))
-        repos = response.json()
+        repos = get_all_repos(conf)
+        logger.info(f'calling user owns {len(repos)} repos')
 
         for repo in repos:
             repo_name = repo['name']
@@ -169,7 +195,7 @@ def perform_github_backup(conf, scheduler, is_exec_necessary):
                 zip_ball_response = requests.get(f'{api_url}/zipball', headers=get_std_headers(conf))        
                 safe_write_contents(f"{conf.out_path}{repo_name}", zip_ball_response)
             else:
-                logger.info(f"Repo {repo_name} was excluded")
+                logger.info(f"repo {repo_name} was excluded")
             
         logger.info("done")
     finally:
@@ -193,17 +219,17 @@ def perform_gschmarri_backup(conf, scheduler, is_exec_necessary):
 
 def main():
     logging.basicConfig(format='%(asctime)s %(message)s', stream=sys.stdout, level=logging.INFO)
+    logger = logging.getLogger()
 
     try:
-        logger = logging.getLogger()
         conf = get_config()
         checker_gschmarri = AroundMidnightOnceChecker(conf.run_at_hour)
         checker_github = AroundMidnightOnceChecker(conf.run_at_hour)
         
-        logger.info(f"Interval between checks (in seconds): {WAIT_TIME}")
-        logger.info(f"Current time: {datetime.datetime.now()}")
-        logger.info(f"Excluded repos: {conf.exclusions}")
-        logger.info(f"Performing backup at {conf.run_at_hour} o'clock")
+        logger.info(f"interval between checks (in seconds): {WAIT_TIME}")
+        logger.info(f"current time: {datetime.datetime.now()}")
+        logger.info(f"excluded repos: {conf.exclusions}")
+        logger.info(f"performing backup at {conf.run_at_hour} o'clock")
 
         scheduler = sched.scheduler()
         scheduler.enter(IMMEDIATELY, PRIORITY, perform_github_backup, argument=(conf, scheduler, checker_github.check))
@@ -211,6 +237,7 @@ def main():
         scheduler.run()
     except Exception as e:
         gschmarri.notify(f"Backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])
+        logger.error(f"Backup error: {str(e)}")
     except KeyboardInterrupt:
         pass
 
