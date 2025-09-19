@@ -236,8 +236,8 @@ def main():
         scheduler.enter(IMMEDIATELY, PRIORITY+1, perform_gschmarri_backup, argument=(conf, scheduler, checker_gschmarri.check))
         scheduler.run()
     except Exception as e:
-        gschmarri.notify(f"Backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])
-        logger.error(f"Backup error: {str(e)}")
+        gschmarri.notify(f"backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])
+        logger.error(f"backup error: {str(e)}")
     except KeyboardInterrupt:
         pass
 
