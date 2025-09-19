@@ -159,6 +159,7 @@ def get_all_repos(conf):
 
     while next_found:
         response = requests.get(url, headers=get_std_headers(conf))
+        response.raise_for_status()
         json_data = response.json()
         res = res + json_data
 
@@ -190,7 +191,8 @@ def perform_github_backup(conf, scheduler, is_exec_necessary):
                 api_url = repo['url']
 
                 logger.info(f'backing up {repo_name}')
-                zip_ball_response = requests.get(f'{api_url}/zipball', headers=get_std_headers(conf))        
+                zip_ball_response = requests.get(f'{api_url}/zipball', headers=get_std_headers(conf))
+                zip_ball_response.raise_for_status()
                 safe_write_contents(f"{conf.out_path}{repo_name}", zip_ball_response)
             else:
                 logger.info(f"repo {repo_name} was excluded")
