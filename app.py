@@ -163,12 +163,10 @@ def get_all_repos(conf):
         res = res + json_data
 
         match = exp.search(response.headers['Link'])
+        next_found = match != None
 
-        if match != None:
-            next_found = True
+        if next_found:
             url = match.group(1)
-        else:
-            next_found = False
 
     return  res
 
