@@ -12,6 +12,7 @@ IMMEDIATELY = 1
 PRIORITY = 1
 CONF_API_KEY_VAR = 'API_KEY'
 CONF_RUN_AT_HOUR = 0
+PAGE_SIZE = 30
 
 class ConfigData:
     def __init__(self, github_token=None, out_path=None, api_key=None, run_at_hour=None):
@@ -155,7 +156,7 @@ def get_all_repos(conf):
     next_found = True
     # Implement full pagination just in case someone has more than 100
     # repos ;-).
-    url = 'https://api.github.com/user/repos?per_page=30&type=owner'
+    url = f'https://api.github.com/user/repos?per_page={PAGE_SIZE}&type=owner'
 
     while next_found:
         response = requests.get(url, headers=get_std_headers(conf))
@@ -163,11 +164,15 @@ def get_all_repos(conf):
         json_data = response.json()
         res = res + json_data
 
-        match = exp.search(response.headers['Link'])
-        next_found = match != None
+        # There is no Link header if list fits on one page
+        if 'Link' in response.headers:
+            match = exp.search(response.headers['Link'])
+            next_found = match != None
 
-        if next_found:
-            url = match.group(1)
+            if next_found:
+                url = match.group(1)
+        else:
+            next_found = False
 
     return  res
 
