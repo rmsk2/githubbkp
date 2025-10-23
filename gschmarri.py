@@ -3,7 +3,7 @@ import json
 
 
 CONF_API_PREFIX = "/notifier"
-CONF_HOST_NAME = "https://debshuttle"
+CONF_HOST_NAME = "https://debasus"
 CONF_CA_BUNDLE_NAME = "./private-tls-ca.pem"
 CONF_RECIPIENT = "Martin via Mail"
 
