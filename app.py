@@ -13,6 +13,12 @@ PRIORITY = 1
 CONF_API_KEY_VAR = 'API_KEY'
 CONF_RUN_AT_HOUR = 0
 PAGE_SIZE = 30
+CONF_CA_BUNDLE_NAME = "./private-tls-ca.pem"
+
+CONF_API_PREFIX = "CONF_API_PREFIX"
+CONF_HOST_NAME = "CONF_HOST_NAME"
+CONF_RECIPIENT = "CONF_RECIPIENT"
+
 
 class ConfigData:
     def __init__(self, github_token=None, out_path=None, api_key=None, run_at_hour=None):
@@ -22,6 +28,9 @@ class ConfigData:
         self._api_key = api_key
         self._run_at_hour = run_at_hour
         self._exclusions = []
+        self._api_prefix = ""
+        self._host_name = ""
+        self._recipient = ""
 
     @property
     def github_token(self):
@@ -65,6 +74,31 @@ class ConfigData:
     def exclusions(self, value):
         self._exclusions = value
 
+    @property
+    def api_prefix(self):
+        return self._api_prefix
+
+    @api_prefix.setter
+    def api_prefix(self, value):
+        self._api_prefix = value
+
+    @property
+    def host_name(self):
+        return self._host_name
+
+    @host_name.setter
+    def host_name(self, value):
+        self._host_name = value
+
+    @property
+    def recipient(self):
+        return self._recipient
+
+    @recipient.setter
+    def recipient(self, value):
+        self._recipient = value
+
+
 
 def get_run_at_hour():
     try:
@@ -88,6 +122,9 @@ def get_exclusions():
 def get_config():
     res = ConfigData(os.environ['GHBKP_TOKEN'], os.environ['OUT_PATH'], os.environ[CONF_API_KEY_VAR], get_run_at_hour())
     res.exclusions = get_exclusions()
+    res.recipient = os.environ[CONF_RECIPIENT]
+    res.host_name = os.environ[CONF_HOST_NAME]
+    res.api_prefix = os.environ[CONF_API_PREFIX]
 
     return res
 
@@ -209,6 +246,7 @@ def perform_github_backup(conf, scheduler, is_exec_necessary):
 
 def perform_gschmarri_backup(conf, scheduler, is_exec_necessary):
     logger = logging.getLogger()
+    g_client = gschmarri.GschmarriClient(conf.host_name, conf.api_prefix, conf.recipient, CONF_CA_BUNDLE_NAME)
 
     try:
         logger.info("checking if Gschmarri-Projekt backup has to be performed")
@@ -216,7 +254,7 @@ def perform_gschmarri_backup(conf, scheduler, is_exec_necessary):
             return
 
         logger.info("backing up Gschmarri-Projekt")
-        gschmarri.backup(f"{conf.out_path}gschmarri.bkp")
+        g_client.backup(f"{conf.out_path}gschmarri.bkp")
         logger.info("done")
     finally:
         scheduler.enter(WAIT_TIME, PRIORITY+1, perform_gschmarri_backup, argument=(conf, scheduler, is_exec_necessary))
@@ -228,6 +266,7 @@ def main():
 
     try:
         conf = get_config()
+        g_client = gschmarri.GschmarriClient(conf.host_name, conf.api_prefix, conf.recipient, CONF_CA_BUNDLE_NAME)
         checker_gschmarri = AroundMidnightOnceChecker(conf.run_at_hour)
         checker_github = AroundMidnightOnceChecker(conf.run_at_hour)
         
@@ -241,7 +280,7 @@ def main():
         scheduler.enter(IMMEDIATELY, PRIORITY+1, perform_gschmarri_backup, argument=(conf, scheduler, checker_gschmarri.check))
         scheduler.run()
     except Exception as e:
-        gschmarri.notify(f"backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])
+        g_client.notify(f"backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])
         logger.error(f"backup error: {str(e)}")
     except KeyboardInterrupt:
         pass
@@ -249,4 +288,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
