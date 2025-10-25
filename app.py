@@ -14,23 +14,28 @@ CONF_API_KEY_VAR = 'API_KEY'
 CONF_RUN_AT_HOUR = 0
 PAGE_SIZE = 30
 CONF_CA_BUNDLE_NAME = "./private-tls-ca.pem"
+CONF_MAX_RETRIES = 1
 
+GHBKP_TOKEN = 'GHBKP_TOKEN'
+OUT_PATH = 'OUT_PATH'
+RUN_AT_HOUR = 'RUN_AT_HOUR'
+EXCLUSIONS = 'EXCLUSIONS'
 CONF_API_PREFIX = "CONF_API_PREFIX"
 CONF_HOST_NAME = "CONF_HOST_NAME"
 CONF_RECIPIENT = "CONF_RECIPIENT"
 
 
 class ConfigData:
-    def __init__(self, github_token=None, out_path=None, api_key=None, run_at_hour=None):
-        self._github_token = github_token
+    def __init__(self):
+        self._github_token = ""
         self._out_path = ""
-        self.out_path = out_path
-        self._api_key = api_key
-        self._run_at_hour = run_at_hour
+        self._api_key = ""
+        self._run_at_hour = CONF_RUN_AT_HOUR
         self._exclusions = []
         self._api_prefix = ""
         self._host_name = ""
         self._recipient = ""
+        self._crash_checker = None
 
     @property
     def github_token(self):
@@ -88,6 +93,8 @@ class ConfigData:
 
     @host_name.setter
     def host_name(self, value):
+        if not value.endswith('/'):
+            value += '/'
         self._host_name = value
 
     @property
@@ -98,11 +105,51 @@ class ConfigData:
     def recipient(self, value):
         self._recipient = value
 
+    @property
+    def crash_checker(self):
+        return self._crash_checker
+
+    @crash_checker.setter
+    def crash_checker(self, value):
+        self._crash_checker = value
+
+
+class CrashCounter:
+    def __init__(self, data_path, retries):
+        self._data_path = data_path + "crash_counter"
+        self._retries = retries
+        self._load()
+
+    def record_last_run_crash(self):
+        self._crash_counter += 1
+        self._save()
+
+    def _save(self):
+        with open(self._data_path, "wb") as f:
+            f.write(str(self._crash_counter).encode('utf-8'))
+
+    def _load(self):
+        try:
+            with open(self._data_path, "rb") as f:
+                data = f.read()
+                data_str = data.decode('utf-8')
+
+            self._crash_counter = int(data_str)
+        except:
+            self._crash_counter = 0
+            self._save()
+
+    def reset(self):
+        self._crash_counter = 0
+        self._save()
+
+    def are_we_in_crash_loop(self):
+        return self._crash_counter > self._retries
 
 
 def get_run_at_hour():
     try:
-        value = os.environ['RUN_AT_HOUR']
+        value = os.environ[RUN_AT_HOUR]
         hour = int(value)
         if 0 <= hour <= 23:
             return hour
@@ -114,13 +161,17 @@ def get_run_at_hour():
 
 def get_exclusions():
     try:
-        return os.environ['EXCLUSIONS'].split()
+        return os.environ[EXCLUSIONS].split()
     except:
         return []
 
 
 def get_config():
-    res = ConfigData(os.environ['GHBKP_TOKEN'], os.environ['OUT_PATH'], os.environ[CONF_API_KEY_VAR], get_run_at_hour())
+    res = ConfigData()
+    res.github_token = os.environ[GHBKP_TOKEN]
+    res.out_path = os.environ[OUT_PATH]
+    res.api_key = os.environ[CONF_API_KEY_VAR]
+    res.run_at_hour = get_run_at_hour()
     res.exclusions = get_exclusions()
     res.recipient = os.environ[CONF_RECIPIENT]
     res.host_name = os.environ[CONF_HOST_NAME]
@@ -256,19 +307,41 @@ def perform_gschmarri_backup(conf, scheduler, is_exec_necessary):
         logger.info("backing up Gschmarri-Projekt")
         g_client.backup(f"{conf.out_path}gschmarri.bkp")
         logger.info("done")
+        # Here we assume that this is the last task which was run
+        conf.crash_checker.reset()
     finally:
         scheduler.enter(WAIT_TIME, PRIORITY+1, perform_gschmarri_backup, argument=(conf, scheduler, is_exec_necessary))
+
+
+def get_crash_checker(logger):
+    try:
+        out_p = os.environ[OUT_PATH]
+        if not out_p.endswith('/'):
+            out_p += '/'
+
+        crash_checker = CrashCounter(out_p, CONF_MAX_RETRIES)
+    except Exception as e:
+        logger.error("OUT_PATH not found in environment")
+        raise
+
+    return crash_checker
 
 
 def main():
     logging.basicConfig(format='%(asctime)s %(message)s', stream=sys.stdout, level=logging.INFO)
     logger = logging.getLogger()
+    crash_checker = get_crash_checker(logger)
 
     try:
         conf = get_config()
+        conf.crash_checker = crash_checker
         g_client = gschmarri.GschmarriClient(conf.host_name, conf.api_prefix, conf.recipient, CONF_CA_BUNDLE_NAME)
         checker_gschmarri = AroundMidnightOnceChecker(conf.run_at_hour)
         checker_github = AroundMidnightOnceChecker(conf.run_at_hour)
+
+        if crash_checker.are_we_in_crash_loop():
+            logger.error("crash loop detected. Backing off ...")
+            return
         
         logger.info(f"interval between checks (in seconds): {WAIT_TIME}")
         logger.info(f"current time: {datetime.datetime.now()}")
@@ -281,6 +354,7 @@ def main():
         scheduler.run()
     except Exception as e:
         g_client.notify(f"backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])
+        crash_checker.record_last_run_crash()
         logger.error(f"backup error: {str(e)}")
     except KeyboardInterrupt:
         pass
