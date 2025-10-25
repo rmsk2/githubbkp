@@ -1,18 +1,18 @@
-import requests
 import os
 import sched
 import datetime
 import gschmarri
+import ghclient
 import logging
 import sys
-import re
+
+VERSION_STRING = "1.1.0"
 
 WAIT_TIME = 10 * 60
 IMMEDIATELY = 1
 PRIORITY = 1
 CONF_API_KEY_VAR = 'API_KEY'
 CONF_RUN_AT_HOUR = 0
-PAGE_SIZE = 30
 CONF_CA_BUNDLE_NAME = "./private-tls-ca.pem"
 CONF_MAX_RETRIES = 1
 
@@ -120,7 +120,7 @@ class CrashCounter:
         self._retries = retries
         self._load()
 
-    def record_last_run_crash(self):
+    def record_that_last_run_crashed(self):
         self._crash_counter += 1
         self._save()
 
@@ -143,8 +143,35 @@ class CrashCounter:
         self._crash_counter = 0
         self._save()
 
-    def are_we_in_crash_loop(self):
+    def is_crash_loop_detected(self):
         return self._crash_counter > self._retries
+
+
+class AroundMidnightOnceChecker:
+    def __init__(self, run_at_hour):
+        self.last_result = False
+        self._has_run_at_least_once = False
+        self._run_at_hour = run_at_hour
+
+    def check(self):
+        # Make sure we run backup scripts the first time we are called independent of
+        # self._run_at_hour
+        if not self._has_run_at_least_once:
+            self._has_run_at_least_once = True
+            return True
+
+        now = datetime.datetime.now()
+        around_midnight = (now.hour >= self._run_at_hour) and (now.hour < (self._run_at_hour + 1))
+
+        if around_midnight:
+            if self.last_result:
+                return False
+            else:
+                self.last_result = True
+                return True
+        else:
+            self.last_result = False
+            return False
 
 
 def get_run_at_hour():
@@ -166,7 +193,7 @@ def get_exclusions():
         return []
 
 
-def get_config():
+def get_config(crash_checker):
     res = ConfigData()
     res.github_token = os.environ[GHBKP_TOKEN]
     res.out_path = os.environ[OUT_PATH]
@@ -176,120 +203,22 @@ def get_config():
     res.recipient = os.environ[CONF_RECIPIENT]
     res.host_name = os.environ[CONF_HOST_NAME]
     res.api_prefix = os.environ[CONF_API_PREFIX]
+    res.crash_checker = crash_checker
 
     return res
 
 
-def get_std_headers(conf):
-    headers = {
-        'Authorization': f'Bearer {conf.github_token}',
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28'
-    }
-
-    return headers
-
-
-def safe_write_contents(name_prefix, response):
-    zip_name = f"{name_prefix}.zip"
-    tmp = f"{zip_name}.temp"
-
-    try:
-        os.remove(tmp)
-    except FileNotFoundError:
-        pass
-
-    with open(tmp, 'wb') as f:
-        f.write(response.content)
-
-    try:    
-        os.remove(zip_name)
-    except FileNotFoundError:
-        pass
-    
-    os.rename(tmp, zip_name)
-
-
-class AroundMidnightOnceChecker:
-    def __init__(self, run_at_hour):
-        self.last_result = False
-        self._has_run_at_least_once = False
-        self._run_at_hour = run_at_hour
-    
-    def check(self):
-        # Make sure we run backup scripts the first time we are called independent of
-        # self._run_at_hour
-        if not self._has_run_at_least_once:
-            self._has_run_at_least_once = True
-            return True
-
-        now = datetime.datetime.now()    
-        around_midnight = (now.hour >= self._run_at_hour) and (now.hour < (self._run_at_hour + 1))
-
-        if around_midnight:
-            if self.last_result:
-                return False
-            else:
-                self.last_result = True
-                return True
-        else:
-            self.last_result = False
-            return False
-
-
-def get_all_repos(conf):
-    res = []
-    re_exp = r'^.*<(https://api.github.com/.+)>;\s+rel="next".*$'
-    exp = re.compile(re_exp)
-    next_found = True
-    # Implement full pagination just in case someone has more than 100
-    # repos ;-).
-    url = f'https://api.github.com/user/repos?per_page={PAGE_SIZE}&type=owner'
-
-    while next_found:
-        response = requests.get(url, headers=get_std_headers(conf))
-        response.raise_for_status()
-        json_data = response.json()
-        res = res + json_data
-
-        # There is no Link header if list fits on one page
-        if 'Link' in response.headers:
-            match = exp.search(response.headers['Link'])
-            next_found = match != None
-
-            if next_found:
-                url = match.group(1)
-        else:
-            next_found = False
-
-    return  res
-
-
 def perform_github_backup(conf, scheduler, is_exec_necessary):
     logger = logging.getLogger()
+    gh_client = ghclient.GhClient(conf)
 
     try:
         logger.info("checking if GitHub backup has to be performed")
         if not is_exec_necessary():
             return
 
-        logger.info('getting repos')
-        repos = get_all_repos(conf)
-        logger.info(f'calling user owns {len(repos)} repos')
-
-        for repo in repos:
-            repo_name = repo['name']
-
-            if not (repo_name in conf.exclusions):
-                api_url = repo['url']
-
-                logger.info(f'backing up {repo_name}')
-                zip_ball_response = requests.get(f'{api_url}/zipball', headers=get_std_headers(conf))
-                zip_ball_response.raise_for_status()
-                safe_write_contents(f"{conf.out_path}{repo_name}", zip_ball_response)
-            else:
-                logger.info(f"repo {repo_name} was excluded")
-            
+        logger.info("backing up GitHub repos")
+        gh_client.perform_backup(logger)
         logger.info("done")
     finally:
         scheduler.enter(WAIT_TIME, PRIORITY, perform_github_backup, argument=(conf, scheduler, is_exec_necessary))
@@ -333,16 +262,16 @@ def main():
     crash_checker = get_crash_checker(logger)
 
     try:
-        conf = get_config()
-        conf.crash_checker = crash_checker
+        conf = get_config(crash_checker)
         g_client = gschmarri.GschmarriClient(conf.host_name, conf.api_prefix, conf.recipient, CONF_CA_BUNDLE_NAME)
         checker_gschmarri = AroundMidnightOnceChecker(conf.run_at_hour)
         checker_github = AroundMidnightOnceChecker(conf.run_at_hour)
 
-        if crash_checker.are_we_in_crash_loop():
+        if crash_checker.is_crash_loop_detected():
             logger.error("crash loop detected. Backing off ...")
             return
         
+        logger.info(f"version: {VERSION_STRING}")
         logger.info(f"interval between checks (in seconds): {WAIT_TIME}")
         logger.info(f"current time: {datetime.datetime.now()}")
         logger.info(f"excluded repos: {conf.exclusions}")
@@ -354,7 +283,7 @@ def main():
         scheduler.run()
     except Exception as e:
         logger.error(f"backup error: {str(e)}")
-        crash_checker.record_last_run_crash()
+        crash_checker.record_that_last_run_crashed()
         g_client.notify(f"backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])
     except KeyboardInterrupt:
         pass
