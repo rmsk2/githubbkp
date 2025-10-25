@@ -5,6 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 COPY app.py .
 COPY gschmarri.py .
+COPY ghclient.py .
 COPY private-tls-ca.pem .
 
 RUN pip install -r requirements.txt
