@@ -32,13 +32,17 @@ data:
 
 If backing up a mobile notifier instance is not desired it is easy to remove this functionality from the code. 
 
-At a certain time the `mobilenotifier` API was not available. This caused an exception in that part of the program which performs the `mobilenotifier` backup. While handling
-the exception another API method was called which caused an additional exception in the exception handler. This in turn prevented that the e-mail which was intended to report
-the error was sent. As the software was running in a Kubernetes cluster the pod was restarted because it seemingly had crashed. As a consequence of that the GitHub backup was
-performed again and after that the pod crashed again, because the `mobilenotifier` API was still unreachable. And this was repeated over and over. Kubernetes did not treat
-this as a crash loop. I guess the reason for this was that the GitHub backup takes about a minute and due to that Kubernetes simply assumed that the pod was restarted successfully.
+In a previous version the following problem occurred if the `mobilenotifier` API was not available. The unavailability caused an exception in that part of the program which
+performs the `mobilenotifier` backup. The exception was thrown after the GitHub backup had already been successfully finished and while handling it another `mobilenotifier`
+API method was called which caused an additional exception in the exception handler. This in turn prevented that the e-mail which was intended to report the error was sent.
+As the software was running in a Kubernetes cluster the pod was restarted because it seemingly had crashed. As a consequence of that the GitHub backup was performed again,
+because a new backup is performed each time the program restarts. But as the `mobilenotifier` API was still unreachable the pod crashed again when attempting to do a
+`mobilenotifier` backup. And this was repeated over and over. Kubernetes did not treat this as a crash loop. I guess the reason for this was that the GitHub backup takes
+about a minute and due to that Kubernetes simply assumed that the pod was restarted successfully.
 
-I added a counter to the software which is incremented each time the program is terminated by an exception. This counter is evaluated at program start and immediately ends the
-program if a given threshold of consecutive crashes is reached which hopefully is detected as a crash loop by Kubernetes. The counter takes the form of a simple file called
-`crash_counter` in the `OUT_PATH` directory which contains the number of consecutive crashes as a UTF-8 encoded string. You have to delete this file in order to reenable normal
-startup. The counter is reset to 0 if a backup could be performed successfully.
+In order to remedy this situation I added a counter to the software which is incremented each time the program is terminated by an exception. This counter is evaluated at program
+start and the program immediately ends if a given threshold of consecutive crashes is reached, which in turn is assumed to be detected as a crash loop by Kubernetes. But even if
+Kubernetes does not stop to reinstantiate the pod this approach still prevents that the GitHub API is called excessively often.
+
+The counter takes the form of a simple file called `crash_counter` in the `OUT_PATH` directory which contains the number of consecutive crashes as a UTF-8 encoded string. You
+have to delete this file in order to reenable normal startup. The counter is reset to 0 if a backup could be performed successfully.

@@ -4,7 +4,7 @@ import re
 
 PAGE_SIZE = 30
 
-class GhClient:
+class Client:
     def __init__(self, conf):
         self._github_token = conf.github_token
         self._exclusions = conf.exclusions

@@ -2,7 +2,7 @@ import requests
 import json
 
 
-class GschmarriClient:
+class Client:
     def __init__(self, conf, ca_bundle = None):
         self._host_name = conf.host_name
         self._prefix = conf.api_prefix
