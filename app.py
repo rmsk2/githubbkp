@@ -6,7 +6,7 @@ import ghclient
 import logging
 import sys
 
-VERSION_STRING = "1.1.0"
+VERSION_STRING = "1.1.1"
 
 WAIT_TIME = 10 * 60
 IMMEDIATELY = 1
@@ -226,7 +226,7 @@ def perform_github_backup(conf, scheduler, is_exec_necessary):
 
 def perform_gschmarri_backup(conf, scheduler, is_exec_necessary):
     logger = logging.getLogger()
-    g_client = gschmarri.GschmarriClient(conf.host_name, conf.api_prefix, conf.recipient, CONF_CA_BUNDLE_NAME)
+    g_client = gschmarri.GschmarriClient(conf, CONF_CA_BUNDLE_NAME)
 
     try:
         logger.info("checking if Gschmarri-Projekt backup has to be performed")
@@ -263,7 +263,7 @@ def main():
 
     try:
         conf = get_config(crash_checker)
-        g_client = gschmarri.GschmarriClient(conf.host_name, conf.api_prefix, conf.recipient, CONF_CA_BUNDLE_NAME)
+        g_client = gschmarri.GschmarriClient(conf, CONF_CA_BUNDLE_NAME)
         checker_gschmarri = AroundMidnightOnceChecker(conf.run_at_hour)
         checker_github = AroundMidnightOnceChecker(conf.run_at_hour)
 

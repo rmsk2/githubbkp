@@ -3,10 +3,10 @@ import json
 
 
 class GschmarriClient:
-    def __init__(self, host_name, prefix, recipient, ca_bundle = None):
-        self._host_name = host_name
-        self._prefix = prefix
-        self._recipient = recipient
+    def __init__(self, conf, ca_bundle = None):
+        self._host_name = conf.host_name
+        self._prefix = conf.api_prefix
+        self._recipient = conf.recipient
         self._ca_bundle = ca_bundle
 
     def get_reminders(self):

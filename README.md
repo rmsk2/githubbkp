@@ -32,8 +32,8 @@ data:
 
 If backing up a mobile notifier instance is not desired it is easy to remove this functionality from the code. 
 
-At a certain time the `mobilenotifier` API was not available. This caused an execption in that part of the program which performs the `mobilenotifier` backup. While handling
-the execption another API method was called which caused an additional exception in the exception handler. This in turn prevented that the e-mail which was intended to report
+At a certain time the `mobilenotifier` API was not available. This caused an exception in that part of the program which performs the `mobilenotifier` backup. While handling
+the exception another API method was called which caused an additional exception in the exception handler. This in turn prevented that the e-mail which was intended to report
 the error was sent. As the software was running in a Kubernetes cluster the pod was restarted because it seemingly had crashed. As a consequence of that the GitHub backup was
 performed again and after that the pod crashed again, because the `mobilenotifier` API was still unreachable. And this was repeated over and over. Kubernetes did not treat
 this as a crash loop. I guess the reason for this was that the GitHub backup takes about a minute and due to that Kubernetes simply assumed that the pod was restarted successfully.
