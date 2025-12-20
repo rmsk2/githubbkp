@@ -23,19 +23,26 @@ EXCLUSIONS = 'EXCLUSIONS'
 CONF_API_PREFIX = "CONF_API_PREFIX"
 CONF_HOST_NAME = "CONF_HOST_NAME"
 CONF_RECIPIENT = "CONF_RECIPIENT"
+CERT_FILE = "CERT_FILE"
+KEY_FILE = "KEY_FILE"
+JWT_AUDIENCE = "JWT_AUDIENCE"
+HOST_TOKEN_ISSUER = "HOST_TOKEN_ISSUER"
 
 
 class ConfigData:
     def __init__(self):
         self._github_token = ""
         self._out_path = ""
-        self._api_key = ""
         self._run_at_hour = CONF_RUN_AT_HOUR
         self._exclusions = []
         self._api_prefix = ""
         self._host_name = ""
         self._recipient = ""
         self._crash_checker = None
+        self._token_issuer = ""
+        self._crt_file = ""
+        self._key_file = ""
+        self._audience = ""
 
     @property
     def github_token(self):
@@ -54,14 +61,6 @@ class ConfigData:
         if not value.endswith('/'):
             value += '/'
         self._out_path = value
-    
-    @property
-    def api_key(self):
-        return self._api_key
-
-    @api_key.setter
-    def api_key(self, value):
-        self._api_key = value        
 
     @property
     def run_at_hour(self):
@@ -112,6 +111,40 @@ class ConfigData:
     @crash_checker.setter
     def crash_checker(self, value):
         self._crash_checker = value
+
+    @property
+    def token_issuer(self):
+        return self._token_issuer
+
+    @token_issuer.setter
+    def token_issuer(self, value):
+        if not value.endswith('/'):
+            value += '/'
+        self._token_issuer = value
+
+    @property
+    def audience(self):
+        return self._audience
+
+    @audience.setter
+    def audience(self, value):
+        self._audience = value
+
+    @property
+    def crt_file(self):
+        return self._crt_file
+
+    @crt_file.setter
+    def crt_file(self, value):
+        self._crt_file = value
+
+    @property
+    def key_file(self):
+        return self._key_file
+
+    @key_file.setter
+    def key_file(self, value):
+        self._key_file = value
 
 
 class CrashCounter:
@@ -197,13 +230,16 @@ def get_config(crash_checker):
     res = ConfigData()
     res.github_token = os.environ[GHBKP_TOKEN]
     res.out_path = os.environ[OUT_PATH]
-    res.api_key = os.environ[CONF_API_KEY_VAR]
     res.run_at_hour = get_run_at_hour()
     res.exclusions = get_exclusions()
     res.recipient = os.environ[CONF_RECIPIENT]
     res.host_name = os.environ[CONF_HOST_NAME]
     res.api_prefix = os.environ[CONF_API_PREFIX]
     res.crash_checker = crash_checker
+    res.crt_file = os.environ[CERT_FILE]
+    res.key_file = os.environ[KEY_FILE]
+    res.audience = os.environ[JWT_AUDIENCE]
+    res.token_issuer = os.environ[HOST_TOKEN_ISSUER]
 
     return res
 
@@ -226,9 +262,12 @@ def perform_github_backup(conf, scheduler, is_exec_necessary):
 
 def perform_gschmarri_backup(conf, scheduler, is_exec_necessary):
     logger = logging.getLogger()
-    g_client = gschmarri.Client(conf, CONF_CA_BUNDLE_NAME)
+    token_issuer = gschmarri.TokenIssuer(conf.crt_file, conf.key_file, CONF_CA_BUNDLE_NAME, conf.token_issuer, conf.audience)
 
     try:
+        token = token_issuer.get_token()
+
+        g_client = gschmarri.Client(conf, CONF_CA_BUNDLE_NAME, token)
         logger.info("checking if Gschmarri-Projekt backup has to be performed")
         if not is_exec_necessary():
             return
@@ -263,7 +302,6 @@ def main():
 
     try:
         conf = get_config(crash_checker)
-        g_client = gschmarri.Client(conf, CONF_CA_BUNDLE_NAME)
         checker_gschmarri = AroundMidnightOnceChecker(conf.run_at_hour)
         checker_github = AroundMidnightOnceChecker(conf.run_at_hour)
 
@@ -284,6 +322,9 @@ def main():
     except Exception as e:
         logger.error(f"backup error: {str(e)}")
         crash_checker.record_that_last_run_crashed()
+        token_issuer = gschmarri.TokenIssuer(conf.crt_file, conf.key_file, CONF_CA_BUNDLE_NAME, conf.token_issuer, conf.audience)
+        token = token_issuer.get_token()
+        g_client = gschmarri.Client(conf, CONF_CA_BUNDLE_NAME, token)
         g_client.notify(f"backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])
     except KeyboardInterrupt:
         pass

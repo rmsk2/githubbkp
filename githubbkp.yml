@@ -11,6 +11,10 @@ data:
   CONF_API_PREFIX: "/notifier"
   CONF_HOST_NAME: "https://debasus"
   CONF_RECIPIENT: "Martin via Mail"
+  CERT_FILE: "/opt/tls/tls.crt"
+  KEY_FILE: "/opt/tls/tls.key"
+  JWT_AUDIENCE: "gschmarri"
+  HOST_TOKEN_ISSUER: "https://debasus:4443"
 
 ---
 
@@ -39,6 +43,9 @@ spec:
         volumeMounts:
         - name: data-volume
           mountPath: /data
+        - name: tlscert
+          mountPath: /opt/tls
+          readOnly: true
         envFrom:
         - configMapRef:
             name: githibbkp-config
@@ -48,3 +55,6 @@ spec:
       - name: data-volume
         persistentVolumeClaim:
           claimName: githubbkp-appdata
+      - name: tlscert
+        secret:
+          secretName: token-tls
