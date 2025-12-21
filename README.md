@@ -16,7 +16,7 @@ The backup of each repo consists of a ZIP of all the files belonging to the late
 |`HOST_TOKEN_ISSUER` | The hostname of the token issuer including the protocol specifier `https://`|
 |`CERT_FILE` | Name of the file which contains the client certificate which is needed to athenticate to the token issuer |
 |`KEY_FILE` | Name of the file which contains the corresponding private key which is needed to athenticate to the token issuer |
-|`JWT_AUDIENCE` | The audience of the JWT to request from the token issuer. Only needed for `mobilenotifier backup |
+|`JWT_AUDIENCE` | The audience of the JWT to request from the token issuer. Only needed for `mobilenotifier` backup |
 
 These variables are all set in a `ConfigMap` in the the file `githubbkp.yml`. A persistent volume claim named `githubbkp-appdata` which defines the output directory is contained in `pvc.yml`. It uses an NFS-Server for persistent storage. You may have to adapt that to suit the needs of your environment. In addition the following environment variables are needed to hold credentials. In kubernetes they should be stored in a secret.
 
