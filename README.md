@@ -10,13 +10,16 @@ Tool to backup all public and private GitHub repos owned by the authenticated us
 |`CONF_API_PREFIX`| Has to define the path prefix of the `mobilenotifier` API on the machine determined by `CONF_HOST_NAME`|
 |`CONF_HOST_NAME`| Has to contain the host name of the machine which hosts the `mobilenotifier` API |
 |`CONF_RECIPIENT`| Has to contain the name of the recipient to which error messages are sent via the `/send/{recipient}` endpoint of the `mobilenotifier` API |
+|`HOST_TOKEN_ISSUER` | The hostname of the token issuer including the protocol specifier `https://`|
+|`CERT_FILE` | Name of the file which contains the client certificate which is needed to athenticate to the token issuer |
+|`KEY_FILE` | Name of the file which contains the corresponding private key which is needed to athenticate to the token issuer |
+|`JWT_AUDIENCE` | The audience of the JWT to request from the token issuer. Only needed for `mobilenotifier backup |
 
 These variables are all set in a `ConfigMap` in the the file `githubbkp.yml`. A persistent volume claim named `githubbkp-appdata` which defines the output directory is contained in `pvc.yml`. It uses an NFS-Server for persistent storage. You may have to adapt that to suit the needs of your environment. In addition the following environment variables are needed to hold credentials. In kubernetes they should be stored in a secret.
 
 | Environment variable| Description|
 |-|-|
 | `GHBKP_TOKEN`| A personal GitHub access token (classic or finegrained) which grants read only access to the contents of private repos|
-|`API_KEY`| API key to access the `/api/send` endpoint of [mobilenitfier](https://github.com/rmsk2/mobilenotifier)|
 
 Here a template which can be used to create this secret:
 
@@ -27,10 +30,33 @@ metadata:
   name: githibbkp-secret
 data:
   GHBKP_TOKEN: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-  API_KEY: AAAAAAAAAAAAAAAAAAAA
 ```
 
-If backing up a mobile notifier instance is not desired it is easy to remove this functionality from the code. 
+Additionally the TLS client cert and its private key, which are needed to access the token issuer, have to be specified in a secret of the following form.
+
+```yml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: token-tls
+data:
+  tls.crt: |
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    .
+    .
+    .
+  tls.key: |
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+    .
+    .
+    .
+```
+`githubbkp.yml` mounts this secret to the path `/opt/tls/` in the `githubbkp` pod.
+
+If backing up a mobile notifier instance is not desired it is easy to remove this functionality from the code. Accessing the token issuer is only neccessary if a backup
+of `mobilenotifier`'s state or sending error messages via `mobilenotfier` is desired.
 
 In a previous version the following problem occurred if the `mobilenotifier` API was not available. The unavailability caused an exception in that part of the program which
 performs the `mobilenotifier` backup. The exception was thrown after the GitHub backup had already been successfully finished and while handling it another `mobilenotifier`
