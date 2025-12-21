@@ -1,5 +1,5 @@
 # githubbkp
-Tool to backup all public and private GitHub repos owned by the authenticated user and the state of [mobilenotifier](https://github.com/rmsk2/mobilenotifier). If access to the `mobilenotifier`
+Tool to backup all public and private GitHub repos owned by the authenticated user and the state of [`mobilenotifier`](https://github.com/rmsk2/mobilenotifier). If access to the `mobilenotifier`
 API is necessary, this software has to be able to access my [`tokenissuer`](https://github.com/rmsk2/tokenissuer) software.
 
 The backup of each repo consists of a ZIP of all the files belonging to the latest commit on the default branch. I.e. no commit history, no data on other branches and no tags are saved. The same ZIP can be obtained by clicking on the `Download ZIP` button in GitHub's Web-UI. This software is intended to be run in kubernetes. Find the deployment in `githubbkp.yml` and the pvc in `pvc.yml`. The following environment variables are needed by this project:
