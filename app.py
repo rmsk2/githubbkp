@@ -6,7 +6,7 @@ import gthub
 import logging
 import sys
 
-VERSION_STRING = "1.1.2"
+VERSION_STRING = "1.2.1"
 
 WAIT_TIME = 10 * 60
 IMMEDIATELY = 1
@@ -265,12 +265,12 @@ def perform_gschmarri_backup(conf, scheduler, is_exec_necessary):
     token_issuer = gschmarri.TokenIssuer(conf.crt_file, conf.key_file, CONF_CA_BUNDLE_NAME, conf.token_issuer, conf.audience)
 
     try:
-        token = token_issuer.get_token()
-
-        g_client = gschmarri.Client(conf, CONF_CA_BUNDLE_NAME, token)
         logger.info("checking if Gschmarri-Projekt backup has to be performed")
         if not is_exec_necessary():
             return
+
+        token = token_issuer.get_token()
+        g_client = gschmarri.Client(conf, CONF_CA_BUNDLE_NAME, token)
 
         logger.info("backing up Gschmarri-Projekt")
         g_client.backup(f"{conf.out_path}gschmarri.bkp")
