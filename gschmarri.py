@@ -5,13 +5,14 @@ import json
 class TokenIssuer:
     def __init__(self, crt_file, key_file, ca_bundle, host_name, audience):
         self._cert = (crt_file, key_file)
-        self._url = f"{host_name}jwthmac/issue"
+        self._url = f"{host_name}jwt/issue"
         self._audience = audience
         self._ca_bundle = ca_bundle
 
     def get_token(self):
         body = {
             "audience": self._audience,
+            "algorithm": "HS256"
         }
 
         response = requests.post(self._url, data=json.dumps(body).encode('utf-8'), verify=self._ca_bundle, cert=self._cert)
