@@ -6,12 +6,11 @@ import gthub
 import logging
 import sys
 
-VERSION_STRING = "1.2.1"
+VERSION_STRING = "1.2.2"
 
 WAIT_TIME = 10 * 60
 IMMEDIATELY = 1
 PRIORITY = 1
-CONF_API_KEY_VAR = 'API_KEY'
 CONF_RUN_AT_HOUR = 0
 CONF_CA_BUNDLE_NAME = "./private-tls-ca.pem"
 CONF_MAX_RETRIES = 1
@@ -325,7 +324,7 @@ def main():
         token_issuer = gschmarri.TokenIssuer(conf.crt_file, conf.key_file, CONF_CA_BUNDLE_NAME, conf.token_issuer, conf.audience)
         token = token_issuer.get_token()
         g_client = gschmarri.Client(conf, CONF_CA_BUNDLE_NAME, token)
-        g_client.notify(f"backup error: {str(e)}", os.environ[CONF_API_KEY_VAR])
+        g_client.notify(f"backup error: {str(e)}")
     except KeyboardInterrupt:
         pass
 
