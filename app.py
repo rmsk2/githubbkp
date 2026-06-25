@@ -5,8 +5,9 @@ import gschmarri
 import gthub
 import logging
 import sys
+import cryptography.x509
 
-VERSION_STRING = "1.2.2"
+VERSION_STRING = "1.2.3"
 
 WAIT_TIME = 10 * 60
 IMMEDIATELY = 1
@@ -294,6 +295,11 @@ def get_crash_checker(logger):
     return crash_checker
 
 
+def get_client_crt(file_name):
+    with open(file_name, "rb") as f:
+        return cryptography.x509.load_pem_x509_certificate(f.read())
+
+
 def main():
     logging.basicConfig(format='%(asctime)s %(message)s', stream=sys.stdout, level=logging.INFO)
     logger = logging.getLogger()
@@ -313,6 +319,7 @@ def main():
         logger.info(f"current time: {datetime.datetime.now()}")
         logger.info(f"excluded repos: {conf.exclusions}")
         logger.info(f"performing backup at {conf.run_at_hour} o'clock")
+        logger.info(f"client cert expires at {get_client_crt(conf.crt_file).not_valid_after_utc}")
 
         scheduler = sched.scheduler()
         scheduler.enter(IMMEDIATELY, PRIORITY, perform_github_backup, argument=(conf, scheduler, checker_github.check))
